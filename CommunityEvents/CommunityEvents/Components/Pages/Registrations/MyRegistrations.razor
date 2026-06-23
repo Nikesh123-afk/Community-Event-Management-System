@@ -1,0 +1,113 @@
+@page "/my-registrations"
+@using CommunityEvents.Interfaces
+@using CommunityEvents.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IRegistrationService RegistrationService
+@inject IParticipantService ParticipantService
+@inject AuthenticationStateProvider AuthStateProvider
+@rendermode InteractiveServer
+
+<PageTitle>My Registrations</PageTitle>
+
+<h1 class="fw-bold mb-4"><i class="bi bi-ticket-perforated me-2 text-primary"></i>My Registrations</h1>
+
+@if (isLoading)
+{
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+}
+else if (registrations is null || !registrations.Any())
+{
+    <div class="alert alert-info text-center py-4">
+        <i class="bi bi-calendar-x me-2 fs-4"></i>
+        <p class="mb-2">You haven't registered for any events yet.</p>
+        <a href="/events" class="btn btn-primary">Browse Events</a>
+    </div>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert @messageClass alert-dismissible mb-4">@message
+            <button type="button" class="btn-close" @onclick="() => message = string.Empty"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        @foreach (var reg in registrations.OrderByDescending(r => r.RegistrationDate))
+        {
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header d-flex justify-content-between align-items-center
+                                @(reg.Status == RegistrationStatus.Confirmed ? "bg-success" :
+                                  reg.Status == RegistrationStatus.WaitListed ? "bg-warning" :
+                                  reg.Status == RegistrationStatus.Cancelled ? "bg-danger" : "bg-secondary") text-white">
+                        <span><i class="bi bi-@GetStatusIcon(reg.Status) me-1"></i>@reg.Status</span>
+                        <small>Reg #@reg.Id</small>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold">@reg.Event?.Name</h5>
+                        <p class="mb-1 text-muted"><i class="bi bi-calendar3 me-1"></i>@reg.Event?.EventDate.ToString("dddd, dd MMMM yyyy")</p>
+                        <p class="mb-1 text-muted"><i class="bi bi-geo-alt me-1"></i>@reg.Event?.Venue?.Name</p>
+                        <p class="mb-3 text-muted small"><i class="bi bi-clock me-1"></i>
+                            @reg.Event?.StartTime.ToString(@"hh\:mm") – @reg.Event?.EndTime.ToString(@"hh\:mm")
+                        </p>
+                        @if (reg.Notes is not null)
+                        {
+                            <p class="text-muted small"><i class="bi bi-chat-text me-1"></i>@reg.Notes</p>
+                        }
+                        <small class="text-muted">Registered: @reg.RegistrationDate.ToString("dd MMM yyyy HH:mm")</small>
+                    </div>
+                    @if (reg.Status != RegistrationStatus.Cancelled && reg.Event?.HasPassed == false)
+                    {
+                        <div class="card-footer bg-transparent">
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => CancelReg(reg.Id)">
+                                <i class="bi bi-x-circle me-1"></i>Cancel Registration
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private IEnumerable<Registration>? registrations;
+    private bool isLoading = true;
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var email = auth.User.Identity?.Name;
+        if (email is not null)
+        {
+            var participant = await ParticipantService.GetParticipantByEmailAsync(email);
+            if (participant is not null)
+                registrations = await RegistrationService.GetRegistrationsForParticipantAsync(participant.Id);
+        }
+        isLoading = false;
+    }
+
+    private async Task CancelReg(int id)
+    {
+        try
+        {
+            await RegistrationService.CancelRegistrationAsync(id);
+            message = "Registration cancelled."; messageClass = "alert-info";
+            // Refresh
+            await OnInitializedAsync();
+        }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+    }
+
+    private static string GetStatusIcon(RegistrationStatus s) => s switch
+    {
+        RegistrationStatus.Confirmed => "check-circle",
+        RegistrationStatus.WaitListed => "hourglass",
+        RegistrationStatus.Cancelled => "x-circle",
+        _ => "clock"
+    };
+}

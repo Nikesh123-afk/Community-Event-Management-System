@@ -1,0 +1,130 @@
+@page "/admin/activities"
+@using CommunityEvents.Interfaces
+@using CommunityEvents.Models
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@inject IActivityService ActivityService
+@rendermode InteractiveServer
+
+<PageTitle>Manage Activities</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold"><i class="bi bi-activity me-2 text-primary"></i>Manage Activities</h1>
+    <button class="btn btn-primary" @onclick="() => ShowForm(null)">
+        <i class="bi bi-plus-circle me-2"></i>Add Activity
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @messageClass alert-dismissible">@message
+        <button type="button" class="btn-close" @onclick="() => message = string.Empty"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-light fw-semibold">@(form?.Id > 0 ? "Edit Activity" : "New Activity")</div>
+        <div class="card-body">
+            <EditForm Model="form!" OnValidSubmit="SaveActivity">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label">Name *</label>
+                        <InputText class="form-control" @bind-Value="form!.Name" />
+                        <ValidationMessage For="() => form.Name" class="text-danger small" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Type</label>
+                        <InputSelect class="form-select" @bind-Value="form!.Type">
+                            @foreach (var t in Enum.GetValues<ActivityType>())
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Duration (min)</label>
+                        <InputNumber class="form-control" @bind-Value="form!.DurationMinutes" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" @bind-Value="form!.Description" rows="2" />
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showForm = false">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (activities is null)
+{
+    <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle shadow-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th><th>Type</th><th>Duration</th><th>Description</th><th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in activities)
+                {
+                    <tr>
+                        <td class="fw-semibold">@a.Name</td>
+                        <td><span class="badge bg-secondary">@a.Type</span></td>
+                        <td>@a.DurationMinutes min</td>
+                        <td class="text-muted small">@(a.Description?.Length > 60 ? a.Description[..60] + "…" : a.Description)</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowForm(a)"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteActivity(a.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IEnumerable<Activity>? activities;
+    private Activity? form;
+    private bool showForm;
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load() => activities = await ActivityService.GetAllActivitiesAsync();
+
+    private void ShowForm(Activity? a)
+    {
+        form = a is null ? new Activity() : new Activity { Id = a.Id, Name = a.Name, Description = a.Description, Type = a.Type, DurationMinutes = a.DurationMinutes };
+        showForm = true;
+    }
+
+    private async Task SaveActivity()
+    {
+        try
+        {
+            if (form!.Id == 0) await ActivityService.CreateActivityAsync(form);
+            else await ActivityService.UpdateActivityAsync(form);
+            message = "Activity saved."; messageClass = "alert-success"; showForm = false;
+        }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+        await Load();
+    }
+
+    private async Task DeleteActivity(int id)
+    {
+        try { await ActivityService.DeleteActivityAsync(id); message = "Deleted."; messageClass = "alert-info"; }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+        await Load();
+    }
+}

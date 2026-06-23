@@ -1,0 +1,268 @@
+@page "/events/{Id:int}"
+@using CommunityEvents.Interfaces
+@using CommunityEvents.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IEventService EventService
+@inject IRegistrationService RegistrationService
+@inject IParticipantService ParticipantService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@rendermode InteractiveServer
+
+<PageTitle>@(evt?.Name ?? "Event Details")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary"></div>
+    </div>
+}
+else if (evt is null)
+{
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Event not found.</div>
+}
+else
+{
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/events">Events</a></li>
+            <li class="breadcrumb-item active">@evt.Name</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <!-- Main Info -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                    <h4 class="mb-0 fw-bold">@evt.Name</h4>
+                    <span class="badge bg-white text-primary">@evt.Type</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-calendar-event text-primary fs-4 me-3"></i>
+                                <div>
+                                    <small class="text-muted">Date</small>
+                                    <div class="fw-semibold">@evt.EventDate.ToString("dddd, dd MMMM yyyy")</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-clock text-primary fs-4 me-3"></i>
+                                <div>
+                                    <small class="text-muted">Time</small>
+                                    <div class="fw-semibold">@evt.StartTime.ToString(@"hh\:mm") – @evt.EndTime.ToString(@"hh\:mm")</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-geo-alt text-primary fs-4 me-3"></i>
+                                <div>
+                                    <small class="text-muted">Venue</small>
+                                    <div class="fw-semibold">@evt.Venue?.Name</div>
+                                    <small class="text-muted">@evt.Venue?.Address</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-people text-primary fs-4 me-3"></i>
+                                <div>
+                                    <small class="text-muted">Capacity</small>
+                                    <div class="fw-semibold">@evt.ConfirmedRegistrationCount / @evt.MaxCapacity registered</div>
+                                    <div class="progress mt-1" style="height:6px;">
+                                        <div class="progress-bar @(evt.IsFull ? "bg-danger" : "bg-success")"
+                                             style="width: @((double)evt.ConfirmedRegistrationCount / evt.MaxCapacity * 100)%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold">Description</h6>
+                    <p class="text-muted">@evt.Description</p>
+
+                    @if (evt.EventActivities.Any())
+                    {
+                        <h6 class="fw-bold mt-4">Activities</h6>
+                        <div class="list-group">
+                            @foreach (var ea in evt.EventActivities.OrderBy(a => a.DisplayOrder))
+                            {
+                                <div class="list-group-item list-group-item-action d-flex justify-content-between">
+                                    <div>
+                                        <i class="bi bi-lightning me-2 text-warning"></i>
+                                        <strong>@ea.Activity?.Name</strong>
+                                        <span class="badge bg-secondary ms-2">@ea.Activity?.Type</span>
+                                        @if (ea.ScheduledStartTime.HasValue)
+                                        {
+                                            <small class="text-muted ms-2">@ @ea.ScheduledStartTime.Value.ToString(@"hh\:mm")</small>
+                                        }
+                                    </div>
+                                    <small class="text-muted">@ea.Activity?.DurationMinutes min</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Registration Panel -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 sticky-top" style="top: 80px;">
+                <div class="card-header bg-light fw-semibold">
+                    <i class="bi bi-ticket-perforated me-2"></i>Register
+                </div>
+                <div class="card-body">
+                    @if (evt.HasPassed)
+                    {
+                        <div class="alert alert-secondary mb-0">
+                            <i class="bi bi-calendar-x me-2"></i>This event has already taken place.
+                        </div>
+                    }
+                    else if (evt.Status == EventStatus.Cancelled)
+                    {
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-x-circle me-2"></i>This event has been cancelled.
+                        </div>
+                    }
+                    else if (!isAuthenticated)
+                    {
+                        <p class="text-muted">Please log in to register for this event.</p>
+                        <a href="Account/Login?returnUrl=/events/@evt.Id" class="btn btn-primary w-100">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Login to Register
+                        </a>
+                    }
+                    else if (alreadyRegistered)
+                    {
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle me-2"></i>You are registered!
+                        </div>
+                        <button class="btn btn-outline-danger w-100" @onclick="CancelMyRegistration" disabled="@isProcessing">
+                            @if (isProcessing) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            <i class="bi bi-x-circle me-1"></i>Cancel Registration
+                        </button>
+                    }
+                    else
+                    {
+                        @if (evt.IsFull)
+                        {
+                            <div class="alert alert-warning">
+                                <i class="bi bi-hourglass me-2"></i>This event is full. You will be added to the wait list.
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes (optional)</label>
+                            <textarea class="form-control" rows="3" @bind="registrationNotes"
+                                      placeholder="Dietary requirements, accessibility needs…"></textarea>
+                        </div>
+
+                        <button class="btn btn-primary w-100" @onclick="RegisterForEvent" disabled="@isProcessing">
+                            @if (isProcessing) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            <i class="bi bi-check-circle me-1"></i>
+                            @(evt.IsFull ? "Join Wait List" : "Register Now")
+                        </button>
+                    }
+
+                    @if (!string.IsNullOrEmpty(statusMessage))
+                    {
+                        <div class="alert @statusClass mt-3 mb-0">@statusMessage</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Event? evt;
+    private bool isLoading = true;
+    private bool isAuthenticated;
+    private bool alreadyRegistered;
+    private bool isProcessing;
+    private int? currentParticipantId;
+    private int? currentRegistrationId;
+    private string? registrationNotes;
+    private string statusMessage = string.Empty;
+    private string statusClass = "alert-info";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
+
+        evt = await EventService.GetEventDetailsAsync(Id);
+
+        if (isAuthenticated && evt is not null)
+        {
+            var email = authState.User.Identity?.Name;
+            if (email is not null)
+            {
+                var participant = await ParticipantService.GetParticipantByEmailAsync(email);
+                if (participant is not null)
+                {
+                    currentParticipantId = participant.Id;
+                    alreadyRegistered = await RegistrationService.IsParticipantRegisteredAsync(participant.Id, Id);
+                    if (alreadyRegistered)
+                    {
+                        var regs = await RegistrationService.GetRegistrationsForParticipantAsync(participant.Id);
+                        currentRegistrationId = regs.FirstOrDefault(r => r.EventId == Id)?.Id;
+                    }
+                }
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private async Task RegisterForEvent()
+    {
+        if (currentParticipantId is null) { statusMessage = "Could not find your participant profile. Please contact admin."; statusClass = "alert-warning"; return; }
+        isProcessing = true;
+        try
+        {
+            var reg = await RegistrationService.RegisterParticipantAsync(currentParticipantId.Value, Id, registrationNotes);
+            alreadyRegistered = true;
+            currentRegistrationId = reg.Id;
+            statusMessage = reg.Status == Models.RegistrationStatus.WaitListed
+                ? "You've been added to the wait list."
+                : "Registration confirmed!";
+            statusClass = "alert-success";
+            evt = await EventService.GetEventDetailsAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            statusMessage = ex.Message;
+            statusClass = "alert-danger";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private async Task CancelMyRegistration()
+    {
+        if (currentRegistrationId is null) return;
+        isProcessing = true;
+        try
+        {
+            await RegistrationService.CancelRegistrationAsync(currentRegistrationId.Value);
+            alreadyRegistered = false;
+            currentRegistrationId = null;
+            statusMessage = "Your registration has been cancelled.";
+            statusClass = "alert-info";
+            evt = await EventService.GetEventDetailsAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            statusMessage = ex.Message;
+            statusClass = "alert-danger";
+        }
+        finally { isProcessing = false; }
+    }
+}

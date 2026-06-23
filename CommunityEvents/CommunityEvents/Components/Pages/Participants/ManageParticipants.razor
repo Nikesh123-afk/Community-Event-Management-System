@@ -1,0 +1,133 @@
+@page "/admin/participants"
+@using CommunityEvents.Interfaces
+@using CommunityEvents.Models
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@inject IParticipantService ParticipantService
+@rendermode InteractiveServer
+
+<PageTitle>Manage Participants</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold"><i class="bi bi-people me-2 text-primary"></i>Manage Participants</h1>
+    <button class="btn btn-primary" @onclick="() => ShowForm(null)">
+        <i class="bi bi-person-plus me-2"></i>Add Participant
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @messageClass alert-dismissible">@message
+        <button type="button" class="btn-close" @onclick="() => message = string.Empty"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-light fw-semibold">@(form?.Id > 0 ? "Edit Participant" : "Add Participant")</div>
+        <div class="card-body">
+            <EditForm Model="form!" OnValidSubmit="SaveParticipant">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">First Name *</label>
+                        <InputText class="form-control" @bind-Value="form!.FirstName" />
+                        <ValidationMessage For="() => form.FirstName" class="text-danger small" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Last Name *</label>
+                        <InputText class="form-control" @bind-Value="form!.LastName" />
+                        <ValidationMessage For="() => form.LastName" class="text-danger small" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Email *</label>
+                        <InputText class="form-control" @bind-Value="form!.Email" />
+                        <ValidationMessage For="() => form.Email" class="text-danger small" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Phone</label>
+                        <InputText class="form-control" @bind-Value="form!.PhoneNumber" />
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Bio</label>
+                        <InputTextArea class="form-control" @bind-Value="form!.Bio" rows="2" />
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Save</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showForm = false">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (participants is null)
+{
+    <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle shadow-sm">
+            <thead class="table-light">
+                <tr><th>Name</th><th>Email</th><th>Phone</th><th>Registrations</th><th class="text-end">Actions</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var p in participants)
+                {
+                    <tr>
+                        <td class="fw-semibold">@p.FullName</td>
+                        <td>@p.Email</td>
+                        <td>@(p.PhoneNumber ?? "—")</td>
+                        <td><span class="badge bg-primary">@p.Registrations.Count</span></td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowForm(p)"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(p.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IEnumerable<Participant>? participants;
+    private Participant? form;
+    private bool showForm;
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load() => participants = await ParticipantService.GetAllParticipantsAsync();
+
+    private void ShowForm(Participant? p)
+    {
+        form = p is null ? new Participant() : new Participant
+        {
+            Id = p.Id, FirstName = p.FirstName, LastName = p.LastName,
+            Email = p.Email, PhoneNumber = p.PhoneNumber, Bio = p.Bio
+        };
+        showForm = true;
+    }
+
+    private async Task SaveParticipant()
+    {
+        try
+        {
+            if (form!.Id == 0) await ParticipantService.CreateParticipantAsync(form);
+            else await ParticipantService.UpdateParticipantAsync(form);
+            message = "Participant saved."; messageClass = "alert-success"; showForm = false;
+        }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+        await Load();
+    }
+
+    private async Task Delete(int id)
+    {
+        try { await ParticipantService.DeleteParticipantAsync(id); message = "Deleted."; messageClass = "alert-info"; }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+        await Load();
+    }
+}

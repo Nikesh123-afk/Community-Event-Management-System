@@ -1,0 +1,137 @@
+@page "/admin/events"
+@using CommunityEvents.Interfaces
+@using CommunityEvents.Models
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@inject IEventService EventService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Manage Events</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold"><i class="bi bi-calendar-plus me-2 text-primary"></i>Manage Events</h1>
+    <a href="/admin/events/create" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-2"></i>Create Event
+    </a>
+</div>
+
+@if (events is null)
+{
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Date</th>
+                            <th>Venue</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Capacity</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var evt in events.OrderBy(e => e.EventDate))
+                        {
+                            <tr>
+                                <td class="fw-semibold">@evt.Name</td>
+                                <td>@evt.EventDate.ToString("dd MMM yyyy")</td>
+                                <td>@evt.Venue?.Name</td>
+                                <td><span class="badge bg-secondary">@evt.Type</span></td>
+                                <td>
+                                    <span class="badge @GetStatusBadge(evt.Status)">@evt.Status</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span>@evt.ConfirmedRegistrationCount/@evt.MaxCapacity</span>
+                                        <div class="progress flex-grow-1" style="height:6px; min-width:60px;">
+                                            <div class="progress-bar @(evt.IsFull ? "bg-danger" : "bg-success")"
+                                                 style="width: @((double)evt.ConfirmedRegistrationCount / Math.Max(evt.MaxCapacity,1)*100)%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-end">
+                                    <a href="/admin/events/edit/@evt.Id" class="btn btn-sm btn-outline-primary me-1">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    @if (evt.Status == EventStatus.Draft)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success me-1"
+                                                @onclick="() => PublishEvent(evt.Id)"
+                                                title="Publish">
+                                            <i class="bi bi-send"></i>
+                                        </button>
+                                    }
+                                    @if (evt.Status != EventStatus.Cancelled)
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning me-1"
+                                                @onclick="() => CancelEvent(evt.Id)"
+                                                title="Cancel">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    }
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => DeleteEvent(evt.Id)"
+                                            title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @messageClass mt-3">@message</div>
+}
+
+@code {
+    private IEnumerable<Event>? events;
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+
+    protected override async Task OnInitializedAsync() => await LoadEvents();
+
+    private async Task LoadEvents()
+        => events = await EventService.GetAllEventsAsync();
+
+    private async Task PublishEvent(int id)
+    {
+        try { await EventService.PublishEventAsync(id); message = "Event published."; messageClass = "alert-success"; }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+        await LoadEvents();
+    }
+
+    private async Task CancelEvent(int id)
+    {
+        try { await EventService.CancelEventAsync(id); message = "Event cancelled."; messageClass = "alert-warning"; }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+        await LoadEvents();
+    }
+
+    private async Task DeleteEvent(int id)
+    {
+        try { await EventService.DeleteEventAsync(id); message = "Event deleted."; messageClass = "alert-info"; }
+        catch (Exception ex) { message = ex.Message; messageClass = "alert-danger"; }
+        await LoadEvents();
+    }
+
+    private static string GetStatusBadge(EventStatus s) => s switch
+    {
+        EventStatus.Published => "bg-success",
+        EventStatus.Cancelled => "bg-danger",
+        EventStatus.Completed => "bg-secondary",
+        _ => "bg-warning text-dark"
+    };
+}

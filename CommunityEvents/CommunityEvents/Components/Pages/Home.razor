@@ -1,0 +1,168 @@
+@page "/"
+@using CommunityEvents.Interfaces
+@using CommunityEvents.Models
+@inject IEventService EventService
+@rendermode InteractiveServer
+
+<PageTitle>Community Events — Home</PageTitle>
+
+<div class="hero bg-primary text-white rounded-4 p-5 mb-5 shadow">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="display-5 fw-bold"><i class="bi bi-calendar-heart me-3"></i>Community Events</h1>
+            <p class="lead mb-4">Discover, join, and organise events that bring our community together.</p>
+            <a href="/events" class="btn btn-light btn-lg me-3">
+                <i class="bi bi-search me-2"></i>Browse Events
+            </a>
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <a href="/admin/events/create" class="btn btn-outline-light btn-lg">
+                        <i class="bi bi-plus-circle me-2"></i>Create Event
+                    </a>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+        <div class="col-md-4 text-center d-none d-md-block">
+            <i class="bi bi-people-fill" style="font-size: 8rem; opacity: 0.3;"></i>
+        </div>
+    </div>
+</div>
+
+@if (upcomingEvents is null)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-3 text-muted">Loading upcoming events…</p>
+    </div>
+}
+else if (!upcomingEvents.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>No upcoming events at the moment. Check back soon!
+    </div>
+}
+else
+{
+    <h2 class="mb-4 fw-semibold"><i class="bi bi-calendar-check me-2 text-primary"></i>Upcoming Events</h2>
+    <div class="row g-4">
+        @foreach (var evt in upcomingEvents.Take(6))
+        {
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-0 hover-lift">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <span class="badge bg-white text-primary">@evt.Type</span>
+                        <small><i class="bi bi-calendar3 me-1"></i>@evt.EventDate.ToString("dd MMM yyyy")</small>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title fw-bold">@evt.Name</h5>
+                        <p class="card-text text-muted flex-grow-1">
+                            @(evt.Description.Length > 100 ? evt.Description[..100] + "…" : evt.Description)
+                        </p>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <small class="text-muted"><i class="bi bi-geo-alt me-1"></i>@evt.Venue?.Name</small>
+                            <small>
+                                @if (evt.IsFull)
+                                {
+                                    <span class="badge bg-danger">Full</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">@evt.AvailableSpots spots left</span>
+                                }
+                            </small>
+                        </div>
+                        <a href="/events/@evt.Id" class="btn btn-outline-primary mt-auto">
+                            <i class="bi bi-arrow-right me-1"></i>View Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (upcomingEvents.Count() > 6)
+    {
+        <div class="text-center mt-4">
+            <a href="/events" class="btn btn-primary btn-lg">
+                <i class="bi bi-grid me-2"></i>View All Events
+            </a>
+        </div>
+    }
+}
+
+@if (stats is not null)
+{
+    <div class="row g-4 mt-5">
+        <div class="col-12">
+            <h2 class="fw-semibold mb-4"><i class="bi bi-bar-chart me-2 text-primary"></i>At a Glance</h2>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body">
+                    <i class="bi bi-calendar-event text-primary" style="font-size:2rem;"></i>
+                    <h3 class="fw-bold mt-2">@stats.TotalEvents</h3>
+                    <p class="text-muted mb-0">Total Events</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body">
+                    <i class="bi bi-people text-success" style="font-size:2rem;"></i>
+                    <h3 class="fw-bold mt-2">@stats.TotalParticipants</h3>
+                    <p class="text-muted mb-0">Participants</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body">
+                    <i class="bi bi-building text-warning" style="font-size:2rem;"></i>
+                    <h3 class="fw-bold mt-2">@stats.TotalVenues</h3>
+                    <p class="text-muted mb-0">Venues</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body">
+                    <i class="bi bi-ticket-perforated text-info" style="font-size:2rem;"></i>
+                    <h3 class="fw-bold mt-2">@stats.TotalRegistrations</h3>
+                    <p class="text-muted mb-0">Registrations</p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IEnumerable<Event>? upcomingEvents;
+    private DashboardStats? stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        upcomingEvents = await EventService.GetUpcomingEventsAsync();
+        // Stats loaded separately — demonstrates async parallelism
+        stats = await LoadStatsAsync();
+    }
+
+    private async Task<DashboardStats> LoadStatsAsync()
+    {
+        var all = await EventService.GetAllEventsAsync();
+        return new DashboardStats
+        {
+            TotalEvents = all.Count(),
+            TotalParticipants = all.SelectMany(e => e.Registrations.Select(r => r.ParticipantId)).Distinct().Count(),
+            TotalVenues = all.Select(e => e.VenueId).Distinct().Count(),
+            TotalRegistrations = all.Sum(e => e.Registrations.Count)
+        };
+    }
+
+    private record DashboardStats
+    {
+        public int TotalEvents { get; init; }
+        public int TotalParticipants { get; init; }
+        public int TotalVenues { get; init; }
+        public int TotalRegistrations { get; init; }
+    }
+}

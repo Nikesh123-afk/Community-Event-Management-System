@@ -1,0 +1,112 @@
+@page "/admin/registrations"
+@using CommunityEvents.Interfaces
+@using CommunityEvents.Models
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@inject IRegistrationService RegistrationService
+@inject IEventService EventService
+@rendermode InteractiveServer
+
+<PageTitle>All Registrations</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold"><i class="bi bi-list-check me-2 text-primary"></i>All Registrations</h1>
+</div>
+
+<div class="mb-3">
+    <label class="form-label fw-semibold">Filter by Event</label>
+    <select class="form-select w-auto" @bind="selectedEventId" @bind:event="onchange" @onchange="Load">
+        <option value="0">All Events</option>
+        @foreach (var e in allEvents)
+        {
+            <option value="@e.Id">@e.Name (@e.EventDate.ToString("dd MMM yyyy"))</option>
+        }
+    </select>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle shadow-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th><th>Participant</th><th>Email</th><th>Event</th>
+                    <th>Registered</th><th>Status</th><th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in registrations)
+                {
+                    <tr>
+                        <td>@r.Id</td>
+                        <td class="fw-semibold">@r.Participant?.FullName</td>
+                        <td>@r.Participant?.Email</td>
+                        <td>@r.Event?.Name</td>
+                        <td>@r.RegistrationDate.ToString("dd MMM yyyy")</td>
+                        <td><span class="badge @GetStatusBadge(r.Status)">@r.Status</span></td>
+                        <td class="text-end">
+                            @if (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.WaitListed)
+                            {
+                                <button class="btn btn-sm btn-outline-success me-1" @onclick="() => Confirm(r.Id)">
+                                    <i class="bi bi-check"></i> Confirm
+                                </button>
+                            }
+                            @if (r.Status != RegistrationStatus.Cancelled)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => Cancel(r.Id)">
+                                    <i class="bi bi-x"></i> Cancel
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="text-muted small">Total: @registrations.Count() registrations</p>
+    </div>
+}
+
+@code {
+    private IEnumerable<Registration> registrations = Enumerable.Empty<Registration>();
+    private IEnumerable<Event> allEvents = Enumerable.Empty<Event>();
+    private int selectedEventId;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allEvents = await EventService.GetAllEventsAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        isLoading = true;
+        registrations = selectedEventId > 0
+            ? await RegistrationService.GetRegistrationsForEventAsync(selectedEventId)
+            : (await EventService.GetAllEventsAsync()).SelectMany(e => e.Registrations).ToList();
+        isLoading = false;
+    }
+
+    private async Task Confirm(int id)
+    {
+        await RegistrationService.ConfirmRegistrationAsync(id);
+        await Load();
+    }
+
+    private async Task Cancel(int id)
+    {
+        await RegistrationService.CancelRegistrationAsync(id);
+        await Load();
+    }
+
+    private static string GetStatusBadge(RegistrationStatus s) => s switch
+    {
+        RegistrationStatus.Confirmed => "bg-success",
+        RegistrationStatus.Cancelled => "bg-danger",
+        RegistrationStatus.WaitListed => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}

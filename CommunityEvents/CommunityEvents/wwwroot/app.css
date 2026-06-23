@@ -1,0 +1,78 @@
+/* ── Community Event Management System — Global Styles ── */
+
+:root {
+    --primary: #0d6efd;
+    --transition-speed: 0.25s;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: #f8f9fa;
+}
+
+/* Smooth hover lift for cards */
+.hover-lift {
+    transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Hero section */
+.hero {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+}
+
+/* Navbar active link underline */
+.navbar .nav-link.active {
+    font-weight: 600;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+/* Spinner centre helper */
+.spinner-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+/* Badge pill override */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.4em 0.65em;
+}
+
+/* Table row hover */
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Progress bars */
+.progress {
+    border-radius: 4px;
+}
+
+/* Form focus ring */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Footer */
+footer {
+    font-size: 0.85rem;
+}
+
+/* Breadcrumb */
+.breadcrumb-item a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    text-decoration: underline;
+}
