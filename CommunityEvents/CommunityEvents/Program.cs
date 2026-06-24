@@ -29,6 +29,7 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>();
 
 // ── Blazor ────────────────────────────────────────────────────────────────────
+builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -68,6 +69,8 @@ app.UseStaticFiles();
 app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapRazorPages();
 
 app.MapRazorComponents<CommunityEvents.Components.App>()
     .AddInteractiveServerRenderMode();
