@@ -1,3 +1,4 @@
+using CommunityEvents.Components.Account;
 using CommunityEvents.Data;
 using CommunityEvents.Interfaces;
 using CommunityEvents.Repositories;

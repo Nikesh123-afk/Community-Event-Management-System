@@ -21,17 +21,15 @@
             <div class="col-md-3">
                 <label class="form-label">Search</label>
                 <input type="text" class="form-control" placeholder="Name, description…"
-                       @bind="searchQuery" @bind:event="oninput" @oninput="ApplyFilters" />
+                       @bind="searchQuery" @bind:after="ApplyFilters" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">Date</label>
-                <input type="date" class="form-control" @bind="selectedDate" @bind:event="onchange"
-                       @onchange="ApplyFilters" />
+                <input type="date" class="form-control" @bind="selectedDate" @bind:after="ApplyFilters" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">Venue</label>
-                <select class="form-select" @bind="selectedVenueId" @bind:event="onchange"
-                        @onchange="ApplyFilters">
+                <select class="form-select" @bind="selectedVenueId" @bind:after="ApplyFilters">
                     <option value="0">All Venues</option>
                     @foreach (var venue in venues)
                     {
@@ -41,8 +39,7 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Activity Type</label>
-                <select class="form-select" @bind="selectedActivityType" @bind:event="onchange"
-                        @onchange="ApplyFilters">
+                <select class="form-select" @bind="selectedActivityType" @bind:after="ApplyFilters">
                     <option value="">All Types</option>
                     @foreach (var type in Enum.GetValues<ActivityType>())
                     {
